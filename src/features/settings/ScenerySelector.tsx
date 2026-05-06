@@ -36,6 +36,7 @@ const ScenerySelector = () => {
         <MenuItem value='day'>{t('settings.scenery.day')}</MenuItem>
         <MenuItem value='night'>{t('settings.scenery.night')}</MenuItem>
         <MenuItem value='indoor'>{t('settings.scenery.indoor')}</MenuItem>
+        <MenuItem value='custom'>Custom Environment</MenuItem>
       </Select>
     </FormControl>
   );

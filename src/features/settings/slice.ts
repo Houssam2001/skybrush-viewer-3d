@@ -17,7 +17,7 @@ type SettingsSliceState = {
     fps: number;
   };
   threeD: {
-    scenery: 'disabled' | 'auto' | 'day' | 'night' | 'indoor';
+    scenery: 'disabled' | 'auto' | 'day' | 'night' | 'indoor' | 'custom';
     axes: boolean;
     grid: 'none' | '1x1' | '2x2';
     quality: 'low' | 'medium' | 'high';
@@ -27,6 +27,7 @@ type SettingsSliceState = {
     showYaw: boolean;
     droneRadius?: number;
     droneModel?: DroneModelType;
+    customEnvironment?: import('./types').CustomEnvironmentSettings;
   };
 };
 
@@ -74,6 +75,19 @@ const initialState: SettingsSliceState = {
 
     // Drone model to use in the 3D view
     droneModel: DEFAULT_DRONE_MODEL,
+
+    // Custom environment settings
+    customEnvironment: {
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      shadows: true,
+      cameraPosition: [0, 1.6, 40],
+      googleApiKey: '',
+      latitude: 47.497912, // Budapest as default
+      longitude: 19.040235,
+      useGoogleMaps: false,
+    },
   },
 };
 
@@ -98,6 +112,11 @@ const { actions, reducer } = createSlice({
 
         if (state_[category] !== undefined) {
           state_[category] = { ...state_[category], ...updates };
+          
+          // Automatically switch to custom scenery if Google Maps is enabled
+          if (category === 'threeD' && updates.customEnvironment?.useGoogleMaps) {
+            state.threeD.scenery = 'custom';
+          }
         }
       },
     },

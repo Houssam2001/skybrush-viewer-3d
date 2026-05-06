@@ -31,8 +31,8 @@ export const getInitialThreeJsCameraConfiguration = createSelector(
  */
 export const getEffectiveScenery = (
   state: RootState
-): 'disabled' | 'day' | 'night' | 'indoor' => {
-  const scenery: 'disabled' | 'day' | 'night' | 'indoor' | 'auto' =
+): 'disabled' | 'day' | 'night' | 'indoor' | 'custom' => {
+  const scenery: 'disabled' | 'day' | 'night' | 'indoor' | 'custom' | 'auto' =
     get(state, 'settings.threeD.scenery') || 'auto';
 
   if (scenery === 'auto') {

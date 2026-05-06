@@ -264,6 +264,7 @@ AFrame.registerSystem('drone-flock', {
       this._entityFactories[droneModel] ?? this._entityFactories.default;
     const droneEntity = factory();
     droneEntity.setAttribute('material', createFlatShadedMaterialProps());
+    droneEntity.setAttribute('shadow', 'cast: true; receive: true');
 
     droneEntity.append(this._createYawIndicatorEntity(showYaw));
 

@@ -6,6 +6,7 @@ import FrameRateSelector from '~/features/settings/FrameRateSelector';
 import LanguageSelector from '~/features/settings/LanguageSelector';
 import PlaybackSpeedSelector from '~/features/settings/PlaybackSpeedSelector';
 import ScenerySelector from '~/features/settings/ScenerySelector';
+import CustomEnvironmentUploader from '~/features/settings/CustomEnvironmentUploader';
 import ThreeDViewSettingToggles from '~/features/settings/ThreeDViewSettingToggles';
 
 /**
@@ -19,6 +20,7 @@ const SettingsTab = () => (
 
     <Box px={2} pt={2}>
       <ScenerySelector />
+      <CustomEnvironmentUploader />
     </Box>
 
     <Box px={2} pt={2}>

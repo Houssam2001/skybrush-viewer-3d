@@ -18,6 +18,18 @@ export const setLanguage = (language: string) =>
 export const setScenery = (scenery: SceneryType) =>
   updateAppSettings('threeD', { scenery });
 
+export const setCustomEnvironmentSettings = (
+  customEnvironment: Partial<import('./types').CustomEnvironmentSettings>
+): AppThunk => (dispatch, getState) => {
+  const state = getState();
+  const currentSettings = state.settings.threeD.customEnvironment || {};
+  dispatch(
+    updateAppSettings('threeD', {
+      customEnvironment: { ...currentSettings, ...customEnvironment },
+    })
+  );
+};
+
 export const setSimulatedPlaybackFrameRate = (fps: number) =>
   updateAppSettings('playback', {
     fps: isSupportedFrameRate(fps) ? fps : DEFAULT_PLAYBACK_FPS,

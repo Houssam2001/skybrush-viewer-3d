@@ -18,7 +18,7 @@ import type {
 } from '@skybrush/aframe-components/spatial';
 
 import { getDroneModel } from '~/features/settings/selectors';
-import type { DroneModelType } from '~/features/settings/types';
+import type { DroneModelType, CustomEnvironmentSettings } from '~/features/settings/types';
 import {
   getLoadedShowId,
   getNumberOfDronesInShow,
@@ -45,6 +45,7 @@ type ThreeDViewProps = {
     rotation: ThreeJsRotationTuple;
   };
   readonly cameraRef: React.RefObject<Entity | null>;
+  readonly customEnvironment?: CustomEnvironmentSettings;
   readonly droneModel: DroneModelType;
   readonly droneRadius: number;
   readonly grid: boolean | string;
@@ -73,6 +74,7 @@ const ThreeDView = (props: ThreeDViewProps) => {
     axes,
     cameraConfiguration = DEFAULT_CAMERA_CONFIGURATION,
     cameraRef,
+    customEnvironment,
     droneModel,
     droneRadius,
     grid,
@@ -89,6 +91,7 @@ const ThreeDView = (props: ThreeDViewProps) => {
   } = props;
 
   const [cameraId, setCameraId] = useState(0);
+  const [sceneLoaded, setSceneLoaded] = useState(false);
 
   const extraCameraProps = {
     'look-controls': objectToString({
@@ -104,6 +107,20 @@ const ThreeDView = (props: ThreeDViewProps) => {
       reverseMouseDrag: true,
     }),
   };
+
+  useEffect(() => {
+    const scene = document.querySelector('a-scene');
+    if (scene) {
+      if ((scene as any).hasLoaded) {
+        setSceneLoaded(true);
+      } else {
+        const onLoaded = () => setSceneLoaded(true);
+        scene.addEventListener('loaded', onLoaded);
+        return () => scene.removeEventListener('loaded', onLoaded);
+      }
+    }
+  }, []);
+
   const extraSceneProps: Record<string, string> = {};
   const isLightScenery = scenery === 'day';
   const isSceneryEnabled = scenery !== 'disabled';
@@ -130,10 +147,10 @@ const ThreeDView = (props: ThreeDViewProps) => {
   // in Chrome, but it's still a problem in both cases. That's why we need a
   // separate cameraId and sceneLoaded state
   useEffect(() => {
-    if (showId !== cameraId && cameraRef.current?.sceneEl?.hasLoaded) {
+    if (showId !== cameraId && sceneLoaded) {
       setCameraId(showId);
     }
-  }, [cameraId, cameraRef, showId]);
+  }, [cameraId, sceneLoaded, showId]);
 
   return (
     <a-scene
@@ -141,7 +158,8 @@ const ThreeDView = (props: ThreeDViewProps) => {
       deallocate
       keyboard-shortcuts={objectToString({ enterVR: vrEnabled })}
       loading-screen='backgroundColor: #444; dotsColor: #888'
-      renderer='antialias: false'
+      renderer='antialias: true'
+      shadow={customEnvironment?.shadows ? 'type: pcfsoft' : ''}
       {...extraSceneProps}
     >
       <a-assets>
@@ -153,7 +171,7 @@ const ThreeDView = (props: ThreeDViewProps) => {
         key={`camera-${cameraId}`}
         ref={cameraRef}
         id={SCENE_CAMERA_ID}
-        position={cameraConfiguration.position.join(' ')}
+        position={scenery === 'custom' && customEnvironment?.cameraPosition ? customEnvironment.cameraPosition.join(' ') : cameraConfiguration.position.join(' ')}
         rotation={cameraConfiguration.rotation.join(' ')}
         {...extraCameraProps}
       >
@@ -181,7 +199,12 @@ const ThreeDView = (props: ThreeDViewProps) => {
         {/* <VelocityArrows /> */}
       </a-entity>
 
-      <Scenery type={scenery} grid={grid} />
+      <Scenery
+        type={scenery}
+        grid={grid}
+        customSettings={customEnvironment}
+        sceneLoaded={sceneLoaded}
+      />
     </a-scene>
   );
 };
@@ -197,6 +220,7 @@ export default connect(
     droneModel: getDroneModel(state),
     droneRadius: getEffectiveDroneRadius(state),
     scenery: getEffectiveScenery(state),
+    customEnvironment: state.settings.threeD.customEnvironment,
   }),
   // mapDispatchToProps
   {},

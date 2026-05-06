@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Google Maps 3D Tiles – Standalone Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; font-family: sans-serif; }
+
+    #ui {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 9999;
+      background: rgba(0,0,0,0.85);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 18px 22px;
+      color: #fff;
+      min-width: 300px;
+      backdrop-filter: blur(10px);
+    }
+    #ui h2 { font-size: 15px; color: #a78bfa; margin-bottom: 14px; letter-spacing: .5px; }
+    #ui label { font-size: 11px; color: #9ca3af; display: block; margin-bottom: 4px; margin-top: 10px; text-transform: uppercase; }
+    #ui input {
+      width: 100%;
+      padding: 7px 10px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    #ui .row { display: flex; gap: 8px; }
+    #ui .row input { flex: 1; }
+    button {
+      margin-top: 14px;
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.05);
+      color: #6ee7b7;
+    }
+    #log {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #9ca3af;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    #log div { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
+    a-scene { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <h2>🗺 Google Maps 3D Tiles Test</h2>
+
+  <label>Google API Key</label>
+  <input id="apiKey" type="password" placeholder="AIza..." value="" />
+
+  <label>Latitude / Longitude</label>
+  <div class="row">
+    <input id="lat" type="number" step="any" value="47.5025" placeholder="Lat" />
+    <input id="lng" type="number" step="any" value="19.0435" placeholder="Lng" />
+  </div>
+
+  <button id="loadBtn">Load 3D Map</button>
+
+  <div id="status">Enter API key and press Load.</div>
+  <div id="log"></div>
+</div>
+
+<!-- A-Frame -->
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+<!-- three-loader-3dtiles from CDN (Latest) -->
+<script src="https://cdn.jsdelivr.net/npm/three-loader-3dtiles@latest/dist/three-loader-3dtiles.js"></script>
+
+<a-scene
+  id="scene"
+  background="color: #111"
+  renderer="antialias: true; logarithmicDepthBuffer: true"
+>
+  <a-entity id="tiles-root"></a-entity>
+  
+  <a-entity id="rig" position="0 50 100">
+    <a-camera
+      id="cam"
+      look-controls
+      wasd-controls="acceleration: 500"
+      near="0.1"
+      far="1000000"
+    ></a-camera>
+  </a-entity>
+
+  <a-entity light="type: ambient; intensity: 2"></a-entity>
+</a-scene>
+
+<script>
+  const status = document.getElementById('status');
+  const logEl  = document.getElementById('log');
+
+  function setStatus(msg) { status.textContent = msg; addLog(msg); }
+  function addLog(msg) {
+    const d = document.createElement('div');
+    d.textContent = new Date().toLocaleTimeString().split(' ')[0] + ' › ' + msg;
+    logEl.prepend(d);
+  }
+
+  let runtime = null;
+
+  document.getElementById('loadBtn').addEventListener('click', async () => {
+    const apiKey = document.getElementById('apiKey').value.trim();
+    const lat    = parseFloat(document.getElementById('lat').value);
+    const lng    = parseFloat(document.getElementById('lng').value);
+
+    if (!apiKey) return setStatus('Please enter an API key.');
+
+    setStatus('Detecting loader...');
+
+    const scene = document.querySelector('a-scene');
+    const renderer = scene.renderer;
+    const camera   = scene.camera;
+    const tilesRoot = document.getElementById('tiles-root');
+
+    if (runtime) {
+      runtime.dispose();
+      tilesRoot.removeObject3D('tileset');
+    }
+
+    const url = `https://tile.googleapis.com/v1/3dtiles/root.json?key=${apiKey}`;
+
+    try {
+      // Robust detection across different CDN versions
+      let Loader = null;
+      if (window.Loader3DTiles) {
+        Loader = window.Loader3DTiles;
+      } else if (window.ThreeLoader3DTiles) {
+        Loader = window.ThreeLoader3DTiles.Loader3DTiles || window.ThreeLoader3DTiles;
+      }
+      
+      // Fallback: search window
+      if (!Loader || typeof Loader.load !== 'function') {
+        for (let key in window) {
+          if (window[key] && typeof window[key].load === 'function' && key.toLowerCase().includes('tiles')) {
+            Loader = window[key];
+            break;
+          }
+        }
+      }
+
+      if (!Loader || typeof Loader.load !== 'function') {
+        throw new Error('Loader3DTiles.load not found. Check Console (F12).');
+      }
+
+      addLog('Loader found! Fetching tileset...');
+
+      const { model, runtime: rt } = await Loader.load({
+        url,
+        renderer,
+        viewport: scene.canvas,
+        options: {
+          dracoDecoderPath: 'https://www.gstatic.com/draco/v1/decoders/',
+          basisTranscoderPath: 'https://cdn.jsdelivr.net/npm/three@0.137.0/examples/js/libs/basis/',
+          googleApiKey: apiKey,
+          maximumScreenSpaceError: 16,
+        },
+      });
+
+      runtime = rt;
+      tilesRoot.setObject3D('tileset', model);
+
+      // Try orientation
+      let target = rt;
+      if (!target.orientToGeocoord && rt.getTileset) target = rt.getTileset();
+
+      if (target && target.orientToGeocoord) {
+        addLog('Orienting to geocoords...');
+        target.orientToGeocoord({ lat, long: lng, height: 0 });
+        setStatus('✅ Map Loaded! Use W/A/S/D to fly.');
+      } else {
+        setStatus('⚠️ Loaded, but orientation function missing.');
+      }
+
+      // Sync loop
+      scene.addEventListener('tick', (e) => {
+        if (runtime) runtime.update(e.detail.delta / 1000, renderer, camera);
+      });
+
+    } catch (err) {
+      setStatus('❌ Error: ' + err.message);
+      console.error(err);
+    }
+  });
+</script>
+</body>
+</html>
