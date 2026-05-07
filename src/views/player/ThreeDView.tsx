@@ -65,8 +65,8 @@ type ThreeDViewProps = {
 };
 
 const DEFAULT_CAMERA_CONFIGURATION = {
-  position: [0, 20, 50],
-  rotation: [0, 0, 0],
+  position: [0, 1111000, 0],
+  rotation: [-45, 0, 0], // Looking up at the sky
 };
 
 const ThreeDView = (props: ThreeDViewProps) => {
@@ -92,6 +92,9 @@ const ThreeDView = (props: ThreeDViewProps) => {
 
   const [cameraId, setCameraId] = useState(0);
   const [sceneLoaded, setSceneLoaded] = useState(false);
+  const isGoogleMaps =
+    (customEnvironment?.useGoogleMaps && !!customEnvironment?.googleApiKey) ||
+    !!customEnvironment?.testMode;
 
   const extraCameraProps = {
     'look-controls': objectToString({
@@ -129,9 +132,11 @@ const ThreeDView = (props: ThreeDViewProps) => {
     extraSceneProps.stats = 'true';
   }
 
-  extraSceneProps['xr-mode-ui'] = config.modes.vr
-    ? 'enabled: true; enterVRButton: #vr-button'
-    : 'enabled: false';
+  // `xr-mode-ui` relies on WebXR session internals. Some viewer environments
+  // crash here (e.g. `Cannot read properties of undefined (reading
+  // 'isPresenting')`), which prevents rendering. Since Google Maps 3D tiles
+  // and the normal viewer flow don't require WebXR UI, disable it.
+  extraSceneProps['xr-mode-ui'] = 'enabled: false';
 
   if (!isSceneryEnabled) {
     extraSceneProps.background = 'color: black';
@@ -155,10 +160,14 @@ const ThreeDView = (props: ThreeDViewProps) => {
   return (
     <a-scene
       ref={ref}
-      deallocate
+      // `@skybrush/aframe-components/deallocate` calls
+      // `renderer.forceContextLoss()`, which isn't available on all three.js
+      // renderer builds. When using Google Maps 3D Tiles, keeping deallocate
+      // disabled avoids the crash.
+      deallocate={!isGoogleMaps}
       keyboard-shortcuts={objectToString({ enterVR: vrEnabled })}
       loading-screen='backgroundColor: #444; dotsColor: #888'
-      renderer='antialias: true'
+      renderer={isGoogleMaps ? 'antialias: true; logarithmicDepthBuffer: true' : 'antialias: true'}
       shadow={customEnvironment?.shadows ? 'type: pcfsoft' : ''}
       {...extraSceneProps}
     >
@@ -167,19 +176,27 @@ const ThreeDView = (props: ThreeDViewProps) => {
         <a-asset-item id='quadcopter' src={quadcopterModel} />
       </a-assets>
 
-      <a-camera
-        key={`camera-${cameraId}`}
-        ref={cameraRef}
-        id={SCENE_CAMERA_ID}
-        position={scenery === 'custom' && customEnvironment?.cameraPosition ? customEnvironment.cameraPosition.join(' ') : cameraConfiguration.position.join(' ')}
-        rotation={cameraConfiguration.rotation.join(' ')}
-        {...extraCameraProps}
-      >
-        <a-entity
-          cursor='rayOrigin: mouse'
-          raycaster={`objects: .${SELECTABLE_OBJECT_CLASS}; interval: 100`}
-        />
-      </a-camera>
+      {sceneLoaded && (
+        <a-camera
+          key={`camera-${cameraId}-${isGoogleMaps}`}
+          ref={cameraRef}
+          id={SCENE_CAMERA_ID}
+          near={isGoogleMaps ? '0.1' : undefined}
+          far={isGoogleMaps ? '10000' : undefined}
+          position={
+            scenery === 'custom' && customEnvironment?.cameraPosition
+              ? customEnvironment.cameraPosition.join(' ')
+              : cameraConfiguration.position.join(' ')
+          }
+          rotation={cameraConfiguration.rotation.join(' ')}
+          {...extraCameraProps}
+        >
+          <a-entity
+            cursor='rayOrigin: mouse'
+            raycaster={`objects: .${SELECTABLE_OBJECT_CLASS}; interval: 100`}
+          />
+        </a-camera>
+      )}
 
       <a-entity rotation='-90 0 90'>
         {axes && <CoordinateSystemAxes length={10} lineWidth={10} />}

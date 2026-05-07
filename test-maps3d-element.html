@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google Maps 3D (Map3DElement) - Diagnostic</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: #000;
+        color: #fff;
+        font-family: sans-serif;
+      }
+      #ui {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 9999;
+        background: rgba(0, 0, 0, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 16px 18px;
+        min-width: 320px;
+        backdrop-filter: blur(10px);
+      }
+      #ui h2 {
+        font-size: 15px;
+        color: #a78bfa;
+        margin-bottom: 12px;
+        letter-spacing: 0.2px;
+      }
+      #ui label {
+        font-size: 11px;
+        color: #9ca3af;
+        display: block;
+        margin-bottom: 4px;
+        margin-top: 10px;
+        text-transform: uppercase;
+      }
+      #ui input {
+        width: 100%;
+        padding: 7px 10px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        color: #fff;
+        font-size: 13px;
+        outline: none;
+      }
+      #ui .row {
+        display: flex;
+        gap: 8px;
+      }
+      #ui .row input {
+        flex: 1;
+      }
+      #ui button {
+        margin-top: 14px;
+        width: 100%;
+        padding: 10px;
+        background: linear-gradient(135deg, #7c3aed, #4f46e5);
+        border: none;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #6ee7b7;
+        min-height: 24px;
+      }
+      #log {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #9ca3af;
+        max-height: 160px;
+        overflow-y: auto;
+      }
+      #log div {
+        padding: 2px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      /* IMPORTANT: per Google sample, map container height must be explicit */
+      #map3d-root {
+        position: absolute;
+        inset: 0;
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <h2>Maps 3D Diagnostic (Map3DElement)</h2>
+
+      <label>Google API Key</label>
+      <input id="apiKey" type="password" placeholder="AIza..." />
+
+      <label>Center (lat/lng)</label>
+      <div class="row">
+        <input id="lat" type="number" step="any" value="47.497912" placeholder="Lat" />
+        <input id="lng" type="number" step="any" value="19.040235" placeholder="Lng" />
+      </div>
+
+      <label>Altitude (meters)</label>
+      <input id="altitude" type="number" step="any" value="200" />
+
+      <button id="loadBtn">Load 3D Map</button>
+
+      <div id="status">Enter an API key and press Load.</div>
+      <div id="log"></div>
+    </div>
+
+    <div id="map3d-root"></div>
+
+    <script>
+      const status = document.getElementById('status');
+      const logEl = document.getElementById('log');
+      const root = document.getElementById('map3d-root');
+
+      function setStatus(msg) {
+        status.textContent = msg;
+        addLog(msg);
+      }
+
+      function addLog(msg) {
+        const d = document.createElement('div');
+        const ts = new Date().toLocaleTimeString().split(' ')[0];
+        d.textContent = ts + ' › ' + msg;
+        logEl.prepend(d);
+      }
+
+      function loadGoogleMapsScript(apiKey) {
+        return new Promise((resolve, reject) => {
+          // If script already exists, reuse it.
+          const existing = document.querySelector('script[data-google-maps-diag]');
+          if (existing) return resolve();
+
+          const script = document.createElement('script');
+          script.dataset.googleMapsDiag = 'true';
+          script.async = true;
+          script.defer = true;
+          script.onerror = () => reject(new Error('Google Maps script failed to load'));
+
+          // Load maps JS API (no extra libraries required for Map3DElement importLibrary usage)
+          script.src =
+            'https://maps.googleapis.com/maps/api/js?key=' +
+            encodeURIComponent(apiKey) +
+            '&callback=__googleMapsDiagInit';
+
+          window.__googleMapsDiagInit = () => resolve();
+          document.head.appendChild(script);
+        });
+      }
+
+      document.getElementById('loadBtn').addEventListener('click', async () => {
+        try {
+          const apiKey = document.getElementById('apiKey').value.trim();
+          const lat = parseFloat(document.getElementById('lat').value);
+          const lng = parseFloat(document.getElementById('lng').value);
+          const altitude = parseFloat(document.getElementById('altitude').value);
+
+          if (!apiKey) return setStatus('Please enter an API key.');
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return setStatus('Invalid lat/lng.');
+
+          // Clear old map element.
+          root.innerHTML = '';
+          setStatus('Loading Google Maps JS API...');
+
+          await loadGoogleMapsScript(apiKey);
+
+          setStatus("Importing 'maps3d' library...");
+          const { Map3DElement } = await google.maps.importLibrary('maps3d');
+
+          setStatus('Creating Map3D element...');
+          const map = new Map3DElement({
+            center: { lat, lng, altitude },
+            tilt: 67.5,
+            mode: 'HYBRID',
+            gestureHandling: 'COOPERATIVE',
+          });
+          root.appendChild(map);
+
+          setStatus('✅ Map3D element loaded.');
+        } catch (err) {
+          console.error(err);
+          setStatus('❌ Error: ' + (err && err.message ? err.message : String(err)));
+        }
+      });
+    </script>
+  </body>
+</html>
+
