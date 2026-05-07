@@ -266,7 +266,7 @@ const Scenery = ({
     customSettings?.testMode;
 
   return enabled ? (
-    <a-entity position='0 -0.001 0' rotation='90 90 0' scale={`${scale} ${scale} ${scale}`}>
+    <a-entity position='0 -0.001 0' rotation='90 90 90' scale={`${scale} ${scale} ${scale}`}>
       {type === 'custom' ? (
         <>
           <a-entity
