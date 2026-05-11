@@ -50,7 +50,7 @@ if (useHotModuleReloading) {
   );
 
   // Enable hot reload support in dev mode
-  plugins.push(new ReactRefreshWebpackPlugin());
+  plugins.push(new ReactRefreshWebpackPlugin({ overlay: true }));
 
   optimization.runtimeChunk = 'single'; // hot module reloading needs this
 }
@@ -60,7 +60,10 @@ module.exports = merge(baseConfig, {
     app: ['./src/index'],
   },
   devServer: {
-    server: 'https',
+    server: 'http',
+    client: {
+      overlay: true,
+    },
   },
   plugins,
   optimization,

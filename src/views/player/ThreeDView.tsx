@@ -194,9 +194,9 @@ const ThreeDView = (props: ThreeDViewProps) => {
           position={
             scenery === 'custom' && customEnvironment?.cameraPosition
               ? customEnvironment.cameraPosition.join(' ')
-              : cameraConfiguration.position.join(' ')
+              : (cameraConfiguration?.position || [0, 0, 0]).join(' ')
           }
-          rotation={cameraConfiguration.rotation.join(' ')}
+          rotation={(cameraConfiguration?.rotation || [0, 0, 0]).join(' ')}
           {...extraCameraProps}
         >
           <a-entity

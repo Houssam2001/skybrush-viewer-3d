@@ -25,9 +25,9 @@ const CustomEnvironmentUploader = () => {
     return null;
   }
 
-  const posX = customEnvironment?.position[0] ?? 0;
-  const posY = customEnvironment?.position[1] ?? 0;
-  const posZ = customEnvironment?.position[2] ?? 0;
+  const posX = customEnvironment?.position?.[0] ?? 0;
+  const posY = customEnvironment?.position?.[1] ?? 0;
+  const posZ = customEnvironment?.position?.[2] ?? 0;
 
   const camX = customEnvironment?.cameraPosition?.[0] ?? 0;
   const camY = customEnvironment?.cameraPosition?.[1] ?? 20;

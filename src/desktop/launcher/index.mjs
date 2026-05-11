@@ -12,6 +12,18 @@ import setupFileOpener from './file-opener.mjs';
 import setupIpc from './ipc.mjs';
 import registerMediaProtocol from './media-protocol.mjs';
 
+if (app.isPackaged === false) {
+  app.commandLine.appendSwitch('ignore-certificate-errors');
+  app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+    if (url.startsWith('https://localhost:8080')) {
+      event.preventDefault();
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+}
+
 const rootDir =
   typeof __dirname !== 'undefined'
     ? __dirname

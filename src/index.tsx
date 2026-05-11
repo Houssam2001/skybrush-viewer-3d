@@ -13,19 +13,25 @@ import 'tippy.js/themes/light-border.css';
 
 // Suppress "Failed to fetch" popups for background network errors
 const suppressNetworkError = (event: any) => {
-  const reason = event.reason?.message || event.message || String(event.reason || event);
-  if (
-    reason.includes('Failed to fetch') ||
-    reason.includes('Load failed') ||
-    reason.includes('403') ||
-    reason.includes('404') ||
-    reason.includes('rejectionHandler') ||
-    reason.includes('googleapis.com')
-  ) {
-    console.warn('Suppressed background network error:', reason);
-    if (event.preventDefault) event.preventDefault();
-    if (event.stopPropagation) event.stopPropagation();
-    return true;
+  try {
+    const reason = event?.reason?.message || event?.message || '';
+    const reasonStr = String(reason || '');
+    
+    if (
+      reasonStr.includes('Failed to fetch') ||
+      reasonStr.includes('Load failed') ||
+      reasonStr.includes('403') ||
+      reasonStr.includes('404') ||
+      reasonStr.includes('rejectionHandler') ||
+      reasonStr.includes('googleapis.com')
+    ) {
+      console.warn('Suppressed background network error:', reasonStr);
+      if (event.preventDefault) event.preventDefault();
+      if (event.stopPropagation) event.stopPropagation();
+      return true;
+    }
+  } catch (e) {
+    // Ignore errors in the error handler itself
   }
   return false;
 };
