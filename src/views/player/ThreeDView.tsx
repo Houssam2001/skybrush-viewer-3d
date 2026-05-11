@@ -176,6 +176,12 @@ const ThreeDView = (props: ThreeDViewProps) => {
       <a-assets>
         <a-asset-item id='flapper-drone' src={flapperDroneModel} />
         <a-asset-item id='quadcopter' src={quadcopterModel} />
+        {customDroneModelUrl && (
+          <a-asset-item 
+            id={`custom-drone-model-${customDroneModelUrl.substring(customDroneModelUrl.length - 8)}`} 
+            src={customDroneModelUrl} 
+          />
+        )}
       </a-assets>
 
       {sceneLoaded && (
@@ -206,7 +212,7 @@ const ThreeDView = (props: ThreeDViewProps) => {
          * passed to AFrame components as strings! */}
         <a-drone-flock
           drone-model={droneModel}
-          custom-model-url={customDroneModelUrl || ''}
+          custom-model-url={customDroneModelUrl ? `#custom-drone-model-${customDroneModelUrl.substring(customDroneModelUrl.length - 8)}` : ''}
           drone-radius={droneRadius}
           label-color={isLightScenery ? 'black' : 'white'}
           scale-labels={String(!!scaleLabels)}

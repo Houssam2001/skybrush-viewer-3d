@@ -20,5 +20,6 @@ AFrame.registerPrimitive('a-drone-flock', {
     'show-labels': 'drone-flock.showLabels',
     'show-yaw': 'drone-flock.showYaw',
     size: 'drone-flock.size',
+    'custom-model-url': 'drone-flock.customModelUrl',
   },
 });

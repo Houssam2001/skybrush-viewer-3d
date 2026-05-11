@@ -8,6 +8,7 @@ import PlaybackSpeedSelector from '~/features/settings/PlaybackSpeedSelector';
 import ScenerySelector from '~/features/settings/ScenerySelector';
 import CustomEnvironmentUploader from '~/features/settings/CustomEnvironmentUploader';
 import DroneModelSelector from '~/features/settings/DroneModelSelector';
+import ShowFileSelector from '~/features/show/ShowFileSelector';
 import ThreeDViewSettingToggles from '~/features/settings/ThreeDViewSettingToggles';
 
 /**
@@ -15,6 +16,10 @@ import ThreeDViewSettingToggles from '~/features/settings/ThreeDViewSettingToggl
  */
 const SettingsTab = () => (
   <List sx={{ background: 'unset' }}>
+    <Box px={2} pt={1} pb={1}>
+      <ShowFileSelector />
+    </Box>
+
     <Box px={2}>
       <LanguageSelector />
     </Box>

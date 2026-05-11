@@ -21,7 +21,7 @@ if (
       this._hasLoggedUpdateError = false;
       this._frameCounter = 0;
       this._model = null;
-      await this._loadTileset();
+      await this._loadTileset().catch((e: any) => console.error('Initial tileset load failed:', e));
     },
 
     update: async function (this: any, oldData: any) {
@@ -31,7 +31,7 @@ if (
         oldData.long !== this.data.long ||
         oldData.testMode !== this.data.testMode
       ) {
-        this._loadTileset();
+        this._loadTileset().catch((e: any) => console.error('Tileset update failed:', e));
       }
     },
 
@@ -103,7 +103,7 @@ if (
           geometricErrorMultiplier: 0.5, // Lower = more tiles loaded (was 2.0)
           loadingStrategy: 'INCREMENTAL', // Load tiles progressively outward
           queryParams: {
-            key: this.data.googleApiKey,
+            key: this.data.googleApiKey || "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8",
           },
         });
 
@@ -327,7 +327,7 @@ const Scenery = ({
               scale={customSettings?.scale?.join(' ') || '1 1 1'}
               google-maps-3dtiles={objectToString({
                 // googleApiKey: customSettings?.googleApiKey,
-                googleApiKey: "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8",
+                googleApiKey: customSettings?.googleApiKey || "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8",
                 lat: customSettings?.latitude ?? 0,
                 long: customSettings?.longitude ?? 0,
                 altitude: customSettings?.altitude ?? 0,

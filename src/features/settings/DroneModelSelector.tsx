@@ -34,13 +34,18 @@ const DroneModelSelector = () => {
           const JSZip = (await import('jszip')).default;
           const zip = new JSZip();
           const content = await zip.loadAsync(file);
-          const modelFile = content.file(/model\.(glb|gltf|obj)$/i)[0];
+          
+          // Try to find any 3D model file
+          const modelFile = Object.values(content.files).find(f => 
+            !f.dir && /\.(glb|gltf|obj)$/i.test(f.name)
+          );
           
           if (modelFile) {
+            console.log('Found model in .skyc:', modelFile.name);
             const blob = await modelFile.async('blob');
             url = URL.createObjectURL(blob);
           } else {
-            console.warn('No model file found in .skyc');
+            console.warn('No model file found in .skyc. Files:', Object.keys(content.files));
           }
         } catch (error) {
           console.error('Failed to extract .skyc file:', error);
