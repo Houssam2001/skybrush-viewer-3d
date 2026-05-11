@@ -166,10 +166,10 @@ const ThreeDView = (props: ThreeDViewProps) => {
       // `renderer.forceContextLoss()`, which isn't available on all three.js
       // renderer builds. When using Google Maps 3D Tiles, keeping deallocate
       // disabled avoids the crash.
-      deallocate={!isGoogleMaps}
+      deallocate={false}
       keyboard-shortcuts={objectToString({ enterVR: vrEnabled })}
       loading-screen='backgroundColor: #444; dotsColor: #888'
-      renderer={isGoogleMaps ? 'antialias: true; logarithmicDepthBuffer: true' : 'antialias: true'}
+      renderer='antialias: true; logarithmicDepthBuffer: true'
       shadow={customEnvironment?.shadows ? 'type: pcfsoft' : ''}
       {...extraSceneProps}
     >
@@ -189,8 +189,8 @@ const ThreeDView = (props: ThreeDViewProps) => {
           key={`camera-${cameraId}-${isGoogleMaps}`}
           ref={cameraRef}
           id={SCENE_CAMERA_ID}
-          near={isGoogleMaps ? '0.1' : undefined}
-          far={isGoogleMaps ? '10000' : undefined}
+          near={isGoogleMaps ? '0.1' : '0.1'}
+          far={isGoogleMaps ? '10000' : '1000'}
           position={
             scenery === 'custom' && customEnvironment?.cameraPosition
               ? customEnvironment.cameraPosition.join(' ')

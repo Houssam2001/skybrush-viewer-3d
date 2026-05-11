@@ -41,7 +41,7 @@ const plugins = [
 ];
 
 if (useHotModuleReloading) {
-  plugins.push(new ReactRefreshWebpackPlugin());
+  plugins.push(new ReactRefreshWebpackPlugin({ overlay: false }));
 
   optimization.runtimeChunk = 'single'; // hot module reloading needs this
 }
@@ -77,6 +77,9 @@ module.exports = merge(
     devServer: {
       // Fall back to serving index.html when the URL is not found
       historyApiFallback: true,
+      client: {
+        overlay: false,
+      },
     },
 
     optimization,

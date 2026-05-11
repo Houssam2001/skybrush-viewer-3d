@@ -7,6 +7,18 @@ if (
   typeof AFRAME !== 'undefined' &&
   !AFRAME.components['google-maps-3dtiles']
 ) {
+  // Suppress "Failed to fetch" popups for Google Maps tiles
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason?.message || String(event.reason);
+    if (reason.includes('Failed to fetch') && (
+      reason.includes('googleapis.com') || 
+      reason.includes('blob:')
+    )) {
+      console.warn('Suppressed background fetch error:', reason);
+      event.preventDefault();
+    }
+  });
+
   AFRAME.registerComponent('google-maps-3dtiles', {
     schema: {
       googleApiKey: { type: 'string' },
@@ -21,6 +33,8 @@ if (
       this._hasLoggedUpdateError = false;
       this._frameCounter = 0;
       this._model = null;
+      this._loading = false;
+      this._isDisposing = false;
       await this._loadTileset().catch((e: any) => console.error('Initial tileset load failed:', e));
     },
 
@@ -36,7 +50,8 @@ if (
     },
 
     tick: function (this: any, _t: number, dt: number) {
-      if (!this._model || !this.el.sceneEl) return;
+      if (!this._model || !this.el.sceneEl || !this.el.sceneEl.renderer) return;
+      if (this._isDisposing) return;
 
       const sceneEl = this.el.sceneEl;
       const camera = sceneEl.camera;
@@ -61,22 +76,34 @@ if (
     },
 
     remove: function (this: any) {
+      this._isDisposing = true;
       if (this._model) {
-        this._model.dispose();
+        try {
+          this._model.dispose();
+        } catch (e) {
+          // Ignore disposal errors
+        }
         this._model = null;
       }
     },
 
     _loadTileset: async function (this: any) {
+      if (this._loading) return;
+      this._loading = true;
+
       const isTestMode = this.data.testMode;
 
       if (!this.data.googleApiKey && !isTestMode) {
         console.warn('Google Maps 3D Tiles: No API Key provided');
+        this._loading = false;
         return;
       }
 
       const sceneEl = this.el.sceneEl;
-      if (!sceneEl) return;
+      if (!sceneEl) {
+        this._loading = false;
+        return;
+      }
 
       if (!sceneEl.renderer || !sceneEl.canvas) {
         await new Promise<void>((resolve) => {
@@ -90,7 +117,10 @@ if (
 
       this.el.removeObject3D('tileset');
       if (this._model) {
-        this._model.dispose();
+        try {
+          this._model.dispose();
+        } catch (e) { }
+        this._model = null;
       }
 
       const url = 'https://tile.googleapis.com/v1/3dtiles/root.json';
@@ -100,10 +130,10 @@ if (
         const model = new OGC3DTile({
           url,
           renderer: sceneEl.renderer,
-          geometricErrorMultiplier: 0.5, // Lower = more tiles loaded (was 2.0)
-          loadingStrategy: 'INCREMENTAL', // Load tiles progressively outward
+          geometricErrorMultiplier: 0.08,
+          loadingStrategy: 'INCREMENTAL',
           queryParams: {
-            key: this.data.googleApiKey || "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8",
+            key: (this.data.googleApiKey || "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8") ?? "",
           },
         });
 
@@ -135,40 +165,24 @@ if (
           (N * (1 - e2) + h) * sinLat
         );
 
-        // Up vector is the geodetic normal at the surface
         const up = new THREE.Vector3(
           cosLat * cosLon,
           cosLat * sinLon,
           sinLat
         );
 
-        // Rebase logic:
-        // We put the tileset in a group and move the group by the inverse transform.
         const rebaseGroup = new THREE.Group();
         rebaseGroup.add(model);
 
-        // Precise orientation: Y-up, Z-forward (North)
         const ecefUpVec: THREE.Vector3 = up.clone().normalize();
         const localUpVec: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
 
-        // 1. Align ECEF Up with Local Up
         const qAlignUp = new THREE.Quaternion().setFromUnitVectors(ecefUpVec, localUpVec);
-
-        // 2. Align ECEF North with Local North (-Z)
         const ecefEastVec: THREE.Vector3 = new THREE.Vector3(-sinLon, cosLon, 0).normalize();
-
-        // 3. Compute ECEF North from cross product of up and east
         const ecefNorthVec: THREE.Vector3 = new THREE.Vector3()
           .crossVectors(ecefUpVec, ecefEastVec)
           .normalize()
           .negate();
-
-        // if (ecefNorth.lengthSq() < 0.0001) {
-        //   // Fallback for poles
-        //   ecefNorth = new THREE.Vector3(0, 1, 0)
-        //     .projectOnPlane(ecefUp)
-        //     .normalize();
-        // }
 
         const tempNorth = ecefNorthVec.clone().applyQuaternion(qAlignUp);
         const targetNorth = new THREE.Vector3(-1, 0, 0);
@@ -180,7 +194,6 @@ if (
           -yawAngle
         );
 
-        // Combined rotation: ECEF -> Local (right-side up, North-forward)
         const q = qAlignNorth.multiply(qAlignUp);
 
         rebaseGroup.quaternion.copy(q);
@@ -190,7 +203,6 @@ if (
           .multiplyScalar(-1);
         rebaseGroup.updateMatrixWorld(true);
 
-        // Add the rebased group to the A-Frame entity
         this.el.setObject3D('tileset', rebaseGroup);
 
         console.log('Google Maps 3D Tiles: Ready!');
@@ -199,6 +211,8 @@ if (
           'Google Maps 3D Tiles: Load failed:',
           err?.message || err
         );
+      } finally {
+        this._loading = false;
       }
     },
   });
@@ -258,6 +272,7 @@ export type CustomEnvironmentProps = {
   readonly position: [number, number, number];
   readonly rotation: [number, number, number];
   readonly scale: [number, number, number];
+  readonly cameraPosition?: [number, number, number];
   readonly shadows: boolean;
   readonly googleApiKey?: string;
   readonly latitude?: number;
@@ -283,9 +298,10 @@ const Scenery = ({
 }: SceneryProps) => {
   const scale = type === 'custom' ? 1 : type === 'indoor' ? 0.5 : 10;
   const enabled = type !== 'disabled';
-  const isGoogleMaps =
+  const isGoogleMaps = Boolean(
     (customSettings?.useGoogleMaps && customSettings?.googleApiKey) ||
-    customSettings?.testMode;
+    customSettings?.testMode
+  );
 
   return enabled ? (
     <a-entity position='0 -0.001 0' rotation='0 0 0' scale={`${scale} ${scale} ${scale}`}>
@@ -295,11 +311,10 @@ const Scenery = ({
             environment={objectToString({
               preset: 'default',
               lighting: 'none',
-              ground: isGoogleMaps ? 'none' : 'flat', // Disable ground if Google Maps is ON
+              ground: isGoogleMaps ? 'none' : 'flat',
               groundColor: '#3a8ad0ff',
-              grid: typeof grid === 'string' ? grid : grid ? '1x1' : 'none',
-              skyType:
-                'atmosphere',
+              grid: 'none',
+              skyType: 'atmosphere',
             })}
           />
 
@@ -311,7 +326,6 @@ const Scenery = ({
             />
           )}
 
-
           <a-entity light='type: ambient; color: #FFF; intensity: 0.5' />
           <a-entity light='type: hemisphere; color: #FFF; groundColor: #444; intensity: 0.8' />
           <a-entity
@@ -320,14 +334,14 @@ const Scenery = ({
           />
           <a-entity light="type: ambient; intensity: 2"></a-entity>
           <a-entity light="type: directional; intensity: 2" position="1 1 1"></a-entity>
+
           {isGoogleMaps ? (
             <a-entity
-              position={customSettings?.position?.join(' ') || '0 0 0'}
-              rotation={customSettings?.rotation?.join(' ') || '0 0 0'}
-              scale={customSettings?.scale?.join(' ') || '1 1 1'}
+              position={customSettings?.position?.join(' ') ?? '0 0 0'}
+              rotation={customSettings?.rotation?.join(' ') ?? '0 0 0'}
+              scale={customSettings?.scale?.join(' ') ?? '1 1 1'}
               google-maps-3dtiles={objectToString({
-                // googleApiKey: customSettings?.googleApiKey,
-                googleApiKey: customSettings?.googleApiKey || "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8",
+                googleApiKey: customSettings?.googleApiKey ?? customSettings?.testMode ? "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8" : "",
                 lat: customSettings?.latitude ?? 0,
                 long: customSettings?.longitude ?? 0,
                 altitude: customSettings?.altitude ?? 0,
@@ -337,22 +351,14 @@ const Scenery = ({
             />
           ) : (
             <>
-
-              <a-entity
-                geometry='primitive: plane; width: 2000; height: 2000'
-                material='color: #333; transparent: true; opacity: 0.5'
-                rotation='-90 0 0'
-                position='0 -0.01 0'
-              />
               {customSettings?.modelUrl && (
-
                 <a-entity
                   position={customSettings.position?.join(' ') || '0 0 0'}
                   rotation={customSettings.rotation?.join(' ') || '0 0 0'}
                   scale={customSettings.scale?.join(' ') || '1 1 1'}
                 >
                   <a-entity
-                    gltf-model={customSettings.modelUrl}
+                    gltf-model={customSettings.modelUrl || ''}
                     shadow={
                       customSettings.shadows
                         ? 'cast: true; receive: true'

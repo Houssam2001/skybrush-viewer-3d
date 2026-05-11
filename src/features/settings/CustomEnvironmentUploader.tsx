@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSelector } from '~/hooks/store';
 import { setCustomEnvironmentSettings } from './actions';
 import { getScenery } from './selectors';
 import LocationPickerModal from './LocationPickerModal';
+import CustomEnvironmentKeyboardControls from './CustomEnvironmentKeyboardControls';
 
 const CustomEnvironmentUploader = () => {
   const dispatch = useAppDispatch();
@@ -78,6 +79,7 @@ const CustomEnvironmentUploader = () => {
 
   return (
     <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+      <CustomEnvironmentKeyboardControls />
       <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>
         Custom Environment Alignment
       </Typography>
