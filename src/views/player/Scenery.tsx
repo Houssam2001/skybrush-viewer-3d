@@ -14,6 +14,7 @@ if (
       long: { type: 'number' },
       altitude: { type: 'number', default: 0 },
       testMode: { type: 'boolean', default: false },
+      maxConcurrentRequests: { type: 'number', default: 16 },
     },
 
     init: async function (this: any) {
@@ -45,8 +46,8 @@ if (
       camera.updateProjectionMatrix();
 
       try {
-        // @jdultra/threedtiles update loop
-        this._model.update(camera);
+        // Pass renderer so threedtiles can use actual screen resolution for LOD
+        this._model.update(camera, sceneEl.renderer);
         if (this._model.tileLoader) {
           this._model.tileLoader.update();
         }
@@ -92,18 +93,23 @@ if (
         this._model.dispose();
       }
 
-      const url = `https://tile.googleapis.com/v1/3dtiles/root.json?key=${this.data.googleApiKey}`;
+      const url = 'https://tile.googleapis.com/v1/3dtiles/root.json';
       console.log('Google Maps 3D Tiles: Loading with @jdultra/threedtiles');
 
       try {
         const model = new OGC3DTile({
           url,
           renderer: sceneEl.renderer,
-          geometricErrorMultiplier: 2.0, // Adjust for detail
+          geometricErrorMultiplier: 0.5, // Lower = more tiles loaded (was 2.0)
+          loadingStrategy: 'INCREMENTAL', // Load tiles progressively outward
           queryParams: {
             key: this.data.googleApiKey,
           },
         });
+
+        if (model.tileLoader) {
+          model.tileLoader.downloadParallelism = this.data.maxConcurrentRequests;
+        }
 
         this._model = model;
 
@@ -142,27 +148,42 @@ if (
         rebaseGroup.add(model);
 
         // Precise orientation: Y-up, Z-forward (North)
-        const upVec = up.clone().normalize();
-        const northVec = new THREE.Vector3(0, 0, 1).projectOnPlane(upVec).normalize();
-        const eastVec = new THREE.Vector3().crossVectors(northVec, upVec).normalize();
+        const ecefUpVec: THREE.Vector3 = up.clone().normalize();
+        const localUpVec: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
 
-        const rotationMatrix = new THREE.Matrix4().makeBasis(
-          eastVec,
-          upVec,
-          northVec.clone().negate()
-        )
+        // 1. Align ECEF Up with Local Up
+        const qAlignUp = new THREE.Quaternion().setFromUnitVectors(ecefUpVec, localUpVec);
 
-        const q = new THREE.Quaternion().setFromRotationMatrix(rotationMatrix);
-        const userRotation = new THREE.Quaternion().setFromEuler(
-          new THREE.Euler(
-            THREE.MathUtils.degToRad(this.el.getAttribute('rotation')?.x || 0),
-            THREE.MathUtils.degToRad(this.el.getAttribute('rotation')?.y || 0),
-            THREE.MathUtils.degToRad(this.el.getAttribute('rotation')?.z || 0)
-          )
+        // 2. Align ECEF North with Local North (-Z)
+        const ecefEastVec: THREE.Vector3 = new THREE.Vector3(-sinLon, cosLon, 0).normalize();
+
+        // 3. Compute ECEF North from cross product of up and east
+        const ecefNorthVec: THREE.Vector3 = new THREE.Vector3()
+          .crossVectors(ecefUpVec, ecefEastVec)
+          .normalize()
+          .negate();
+
+        // if (ecefNorth.lengthSq() < 0.0001) {
+        //   // Fallback for poles
+        //   ecefNorth = new THREE.Vector3(0, 1, 0)
+        //     .projectOnPlane(ecefUp)
+        //     .normalize();
+        // }
+
+        const tempNorth = ecefNorthVec.clone().applyQuaternion(qAlignUp);
+        const targetNorth = new THREE.Vector3(-1, 0, 0);
+        const yawAngle =
+          Math.atan2(tempNorth.x, tempNorth.z) -
+          Math.atan2(targetNorth.x, targetNorth.z);
+        const qAlignNorth = new THREE.Quaternion().setFromAxisAngle(
+          localUpVec,
+          -yawAngle
         );
 
-        // Combine: geospatial orientation + user rotation
-        rebaseGroup.quaternion.copy(q).multiply(userRotation);
+        // Combined rotation: ECEF -> Local (right-side up, North-forward)
+        const q = qAlignNorth.multiply(qAlignUp);
+
+        rebaseGroup.quaternion.copy(q);
         rebaseGroup.position
           .copy(surfacePos)
           .applyQuaternion(q)
@@ -193,7 +214,7 @@ const grounds = {
   },
   indoor: {
     ground: 'flat',
-    groundColor: '#333',
+    groundColor: '#3763c3ff',
     groundColor2: '#666',
     groundTexture: 'checkerboard',
   },
@@ -205,15 +226,15 @@ const environments = {
     fog: 0.2,
     gridColor: '#fff',
     skyType: 'atmosphere',
-    skyColor: '#88c',
+    skyColor: 'rgba(37, 56, 65, 1)',
     ...grounds.default,
   },
   night: {
     preset: 'starry',
     fog: 0.2,
-    gridColor: '#39d2f2',
+    gridColor: '#2b5861ff',
     skyType: 'atmosphere',
-    skyColor: '#88c',
+    skyColor: 'rgba(5, 46, 71, 1)',
     ...grounds.default,
   },
   indoor: {
@@ -244,6 +265,7 @@ export type CustomEnvironmentProps = {
   readonly altitude?: number;
   readonly useGoogleMaps?: boolean;
   readonly testMode?: boolean;
+  readonly maxConcurrentRequests?: number;
 };
 
 type SceneryProps = {
@@ -266,7 +288,7 @@ const Scenery = ({
     customSettings?.testMode;
 
   return enabled ? (
-    <a-entity position='0 -0.001 0' rotation='90 90 90' scale={`${scale} ${scale} ${scale}`}>
+    <a-entity position='0 -0.001 0' rotation='0 0 0' scale={`${scale} ${scale} ${scale}`}>
       {type === 'custom' ? (
         <>
           <a-entity
@@ -274,13 +296,10 @@ const Scenery = ({
               preset: 'default',
               lighting: 'none',
               ground: isGoogleMaps ? 'none' : 'flat', // Disable ground if Google Maps is ON
-              groundColor: '#444',
+              groundColor: '#3a8ad0ff',
               grid: typeof grid === 'string' ? grid : grid ? '1x1' : 'none',
-              skyType: isGoogleMaps
-                ? 'none'
-                : customSettings?.hdrUrl
-                  ? 'none'
-                  : 'atmosphere',
+              skyType:
+                'atmosphere',
             })}
           />
 
@@ -307,11 +326,13 @@ const Scenery = ({
               rotation={customSettings?.rotation?.join(' ') || '0 0 0'}
               scale={customSettings?.scale?.join(' ') || '1 1 1'}
               google-maps-3dtiles={objectToString({
-                googleApiKey: customSettings?.googleApiKey,
+                // googleApiKey: customSettings?.googleApiKey,
+                googleApiKey: "AIzaSyDABeiKm_a1c0bVRZ44a2icGiIDPhFx5K8",
                 lat: customSettings?.latitude ?? 0,
                 long: customSettings?.longitude ?? 0,
                 altitude: customSettings?.altitude ?? 0,
                 testMode: !!customSettings?.testMode,
+                maxConcurrentRequests: 128,
               })}
             />
           ) : (

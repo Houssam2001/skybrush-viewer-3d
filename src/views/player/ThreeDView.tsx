@@ -47,6 +47,7 @@ type ThreeDViewProps = {
   readonly cameraRef: React.RefObject<Entity | null>;
   readonly customEnvironment?: CustomEnvironmentSettings;
   readonly droneModel: DroneModelType;
+  readonly customDroneModelUrl?: string;
   readonly droneRadius: number;
   readonly grid: boolean | string;
   readonly navigation: {
@@ -76,6 +77,7 @@ const ThreeDView = (props: ThreeDViewProps) => {
     cameraRef,
     customEnvironment,
     droneModel,
+    customDroneModelUrl,
     droneRadius,
     grid,
     navigation,
@@ -204,6 +206,7 @@ const ThreeDView = (props: ThreeDViewProps) => {
          * passed to AFrame components as strings! */}
         <a-drone-flock
           drone-model={droneModel}
+          custom-model-url={customDroneModelUrl || ''}
           drone-radius={droneRadius}
           label-color={isLightScenery ? 'black' : 'white'}
           scale-labels={String(!!scaleLabels)}
@@ -235,6 +238,7 @@ export default connect(
     ...state.settings.threeD,
     ...state.threeD,
     droneModel: getDroneModel(state),
+    customDroneModelUrl: state.settings.threeD.customDroneModelUrl,
     droneRadius: getEffectiveDroneRadius(state),
     scenery: getEffectiveScenery(state),
     customEnvironment: state.settings.threeD.customEnvironment,

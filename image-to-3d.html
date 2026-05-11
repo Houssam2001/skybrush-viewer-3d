@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D → 3D Terrain Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #08080f;
+            color: #e0e0ff;
+            font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── UPLOAD SCREEN ── */
+        #upload-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 28px;
+            padding: 20px;
+            background: radial-gradient(ellipse at 50% 60%, #0f0a2a 0%, #08080f 70%);
+        }
+
+        .logo {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+        }
+
+        .tagline {
+            color: #55557a;
+            font-size: 1.05rem;
+            text-align: center;
+            max-width: 420px;
+            line-height: 1.6;
+        }
+
+        #drop-zone {
+            width: 440px;
+            max-width: 92vw;
+            height: 250px;
+            border: 2px dashed #252545;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            background: linear-gradient(135deg, #0c0c1e, #10102a);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #drop-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(129, 140, 248, 0.05), rgba(192, 132, 252, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #drop-zone:hover::before,
+        #drop-zone.drag-over::before {
+            opacity: 1;
+        }
+
+        #drop-zone:hover,
+        #drop-zone.drag-over {
+            border-color: #6366f1;
+            transform: scale(1.02);
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.15);
+        }
+
+        .drop-icon {
+            font-size: 3.2rem;
+            transition: transform 0.3s;
+        }
+
+        #drop-zone:hover .drop-icon {
+            transform: scale(1.15) translateY(-4px);
+        }
+
+        .drop-text {
+            color: #8888bb;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .drop-subtext {
+            color: #44446a;
+            font-size: 0.82rem;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .tags {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tag {
+            background: #0f0f22;
+            border: 1px solid #1e1e3a;
+            border-radius: 100px;
+            padding: 4px 14px;
+            font-size: 0.8rem;
+            color: #555577;
+        }
+
+        /* ── VIEWER SCREEN ── */
+        #viewer-screen {
+            display: none;
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #three-canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Top Bar */
+        #top-bar {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 8, 20, 0.88);
+            backdrop-filter: blur(20px);
+            border: 1px solid #1c1c38;
+            border-radius: 100px;
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            z-index: 100;
+            white-space: nowrap;
+        }
+
+        .app-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        #back-btn {
+            background: #14142a;
+            border: 1px solid #24244a;
+            color: #7777aa;
+            border-radius: 100px;
+            padding: 5px 14px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #back-btn:hover {
+            background: #1e1e3a;
+            color: #aaaadd;
+        }
+
+        /* Controls Panel */
+        #controls-panel {
+            position: fixed;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(8, 8, 20, 0.92);
+            backdrop-filter: blur(24px);
+            border: 1px solid #1a1a35;
+            border-radius: 18px;
+            padding: 18px;
+            width: 238px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 100;
+            max-height: 92vh;
+            overflow-y: auto;
+        }
+
+        #controls-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #controls-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #controls-panel::-webkit-scrollbar-thumb {
+            background: #2a2a4a;
+            border-radius: 4px;
+        }
+
+        .panel-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #44446a;
+        }
+
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .ctrl-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            color: #7777a0;
+        }
+
+        .ctrl-value {
+            color: #aaaace;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: #18183a;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(129, 140, 248, 0.5);
+            transition: transform 0.15s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .divider {
+            height: 1px;
+            background: #14142a;
+        }
+
+        /* Mode buttons */
+        .mode-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .mode-btn {
+            background: #0f0f22;
+            border: 1px solid #1e1e3a;
+            color: #555577;
+            border-radius: 9px;
+            padding: 7px 6px;
+            font-size: 0.74rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .mode-btn:hover {
+            border-color: #3a3a6a;
+            color: #8888aa;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #1a174a, #2a1060);
+            border-color: #818cf8;
+            color: #c7d2fe;
+            font-weight: 600;
+        }
+
+        /* Toggles */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+            color: #7777a0;
+        }
+
+        .toggle {
+            position: relative;
+            width: 38px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #18183a;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            border: 1px solid #252548;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            top: 2px;
+            background: #44446a;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle input:checked+.toggle-slider {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            border-color: #6366f1;
+        }
+
+        .toggle input:checked+.toggle-slider::before {
+            transform: translateX(18px);
+            background: white;
+        }
+
+        /* Buttons */
+        .btn {
+            background: #0f0f22;
+            border: 1px solid #1e1e3a;
+            color: #7777aa;
+            border-radius: 10px;
+            padding: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #16163a;
+            color: #aaaace;
+            border-color: #6366f1;
+        }
+
+        /* Info bar */
+        #info-bar {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 8, 20, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid #16163a;
+            border-radius: 100px;
+            padding: 5px 18px;
+            font-size: 0.73rem;
+            color: #3a3a5a;
+            display: flex;
+            gap: 18px;
+            z-index: 100;
+            white-space: nowrap;
+        }
+
+        .info-item span {
+            color: #55557a;
+        }
+
+        /* Loading */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 8, 20, 0.96);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            z-index: 200;
+        }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 3px solid #1a1a3a;
+            border-top: 3px solid #818cf8;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-label {
+            color: #55557a;
+            font-size: 0.9rem;
+        }
+
+        .progress-track {
+            width: 200px;
+            height: 3px;
+            background: #16163a;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #818cf8, #c084fc);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ════ UPLOAD SCREEN ════ -->
+    <div id="upload-screen">
+        <div class="logo">2D → 3D</div>
+        <p class="tagline">Upload a top-down or any image and watch it transform into an interactive 3D terrain you can
+            orbit, zoom and explore.</p>
+
+        <div id="drop-zone">
+            <div class="drop-icon">🌍</div>
+            <div class="drop-text">Drop an image here</div>
+            <div class="drop-subtext">or click to browse · JPG, PNG, WebP</div>
+        </div>
+        <input type="file" id="file-input" accept="image/*">
+
+        <div class="tags">
+            <span style="color:#33334a;font-size:.82rem">Works great with</span>
+            <span class="tag">🛰️ Satellite</span>
+            <span class="tag">🗺️ Maps</span>
+            <span class="tag">🏔️ Terrain</span>
+            <span class="tag">🌆 Cityscapes</span>
+        </div>
+    </div>
+
+    <!-- ════ VIEWER SCREEN ════ -->
+    <div id="viewer-screen">
+        <canvas id="three-canvas"></canvas>
+
+        <div id="top-bar">
+            <button id="back-btn">← New Image</button>
+            <span class="app-title">2D → 3D Terrain</span>
+        </div>
+
+        <div id="controls-panel">
+            <div class="panel-title">⚙ Controls</div>
+
+            <div class="ctrl-group">
+                <div class="ctrl-label">
+                    <span>Height Scale</span>
+                    <span class="ctrl-value" id="val-height">2.0</span>
+                </div>
+                <input type="range" id="slider-height" min="0.1" max="8" step="0.1" value="2">
+            </div>
+
+            <div class="ctrl-group">
+                <div class="ctrl-label">
+                    <span>Smoothing</span>
+                    <span class="ctrl-value" id="val-smooth">2</span>
+                </div>
+                <input type="range" id="slider-smooth" min="0" max="10" step="1" value="2">
+            </div>
+
+            <div class="ctrl-group">
+                <div class="ctrl-label">
+                    <span>Mesh Detail</span>
+                    <span class="ctrl-value" id="val-detail">High</span>
+                </div>
+                <input type="range" id="slider-detail" min="0" max="2" step="1" value="1">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="ctrl-group">
+                <div class="ctrl-label"><span>View Mode</span></div>
+                <div class="mode-grid">
+                    <div class="mode-btn active" data-mode="texture">🖼 Texture</div>
+                    <div class="mode-btn" data-mode="height">📊 Height</div>
+                    <div class="mode-btn" data-mode="normal">💡 Lit</div>
+                    <div class="mode-btn" data-mode="wire">📐 Wire</div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="toggle-row">
+                <span>Auto Rotate</span>
+                <label class="toggle"><input type="checkbox" id="tog-rotate"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+                <span>Invert Height</span>
+                <label class="toggle"><input type="checkbox" id="tog-invert"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+                <span>Wireframe Overlay</span>
+                <label class="toggle"><input type="checkbox" id="tog-wire"><span class="toggle-slider"></span></label>
+            </div>
+
+            <div class="divider"></div>
+
+            <button class="btn" id="btn-reset">⟳ Reset Camera</button>
+            <button class="btn" id="btn-screenshot">📷 Screenshot</button>
+        </div>
+
+        <div id="info-bar">
+            <span class="info-item"><span>🖱 Drag</span> orbit</span>
+            <span class="info-item"><span>Scroll</span> zoom</span>
+            <span class="info-item"><span>Right-drag</span> pan</span>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-label" id="loading-label">Generating 3D terrain…</div>
+        <div class="progress-track">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ════════════════════════════════════════
+        //  STATE
+        // ════════════════════════════════════════
+        const HMSIZE = 512; // height map resolution
+        const DETAIL_SEGS = [120, 220, 320]; // low / med / high
+        const DETAIL_LABELS = ['Low', 'High', 'Ultra'];
+
+        let scene, camera, renderer, orbitControls;
+        let terrainMesh = null, wireMesh = null;
+        let currentHeightData = null;
+        let origTexture = null, heightTex = null;
+        let srcImage = null;
+        let animId = null;
+
+        let heightScale = 2.0;
+        let smoothing = 2;
+        let detailIdx = 1;
+        let invertH = false;
+        let autoRotate = false;
+        let showWire = false;
+        let viewMode = 'texture';
+
+        // ════════════════════════════════════════
+        //  IMAGE PROCESSING
+        // ════════════════════════════════════════
+
+        function imgToGrayscale(img, blur) {
+            const c = document.createElement('canvas');
+            c.width = c.height = HMSIZE;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, HMSIZE, HMSIZE);
+            const { data } = ctx.getImageData(0, 0, HMSIZE, HMSIZE);
+
+            let raw = new Float32Array(HMSIZE * HMSIZE);
+            for (let i = 0; i < raw.length; i++) {
+                raw[i] = (0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]) / 255;
+            }
+
+            if (blur > 0) raw = boxBlur(raw, HMSIZE, HMSIZE, blur);
+
+            // Normalize
+            let lo = Infinity, hi = -Infinity;
+            for (const v of raw) { if (v < lo) lo = v; if (v > hi) hi = v; }
+            const range = hi - lo || 1;
+            for (let i = 0; i < raw.length; i++) raw[i] = (raw[i] - lo) / range;
+
+            return raw;
+        }
+
+        function boxBlur(data, w, h, r) {
+            const tmp = new Float32Array(data.length);
+            const out = new Float32Array(data.length);
+
+            // Horizontal
+            for (let y = 0; y < h; y++) {
+                let sum = 0, cnt = 0;
+                for (let x = 0; x < Math.min(r, w); x++) { sum += data[y * w + x]; cnt++; }
+                for (let x = 0; x < w; x++) {
+                    if (x + r < w) { sum += data[y * w + x + r]; cnt++; }
+                    if (x - r - 1 >= 0) { sum -= data[y * w + x - r - 1]; cnt--; }
+                    tmp[y * w + x] = sum / cnt;
+                }
+            }
+
+            // Vertical
+            for (let x = 0; x < w; x++) {
+                let sum = 0, cnt = 0;
+                for (let y = 0; y < Math.min(r, h); y++) { sum += tmp[y * w + x]; cnt++; }
+                for (let y = 0; y < h; y++) {
+                    if (y + r < h) { sum += tmp[(y + r) * w + x]; cnt++; }
+                    if (y - r - 1 >= 0) { sum -= tmp[(y - r - 1) * w + x]; cnt--; }
+                    out[y * w + x] = sum / cnt;
+                }
+            }
+
+            return out;
+        }
+
+        function sampleH(data, u, v) {
+            const x = u * (HMSIZE - 1), y = v * (HMSIZE - 1);
+            const x0 = Math.floor(x), y0 = Math.floor(y);
+            const x1 = Math.min(x0 + 1, HMSIZE - 1), y1 = Math.min(y0 + 1, HMSIZE - 1);
+            const fx = x - x0, fy = y - y0;
+            return data[y0 * HMSIZE + x0] * (1 - fx) * (1 - fy)
+                + data[y0 * HMSIZE + x1] * fx * (1 - fy)
+                + data[y1 * HMSIZE + x0] * (1 - fx) * fy
+                + data[y1 * HMSIZE + x1] * fx * fy;
+        }
+
+        function makeHeightColorTex(data) {
+            const c = document.createElement('canvas');
+            c.width = c.height = HMSIZE;
+            const ctx = c.getContext('2d');
+            const id = ctx.createImageData(HMSIZE, HMSIZE);
+            const d = id.data;
+            for (let i = 0; i < data.length; i++) {
+                const t = data[i];
+                let r, g, b;
+                if (t < 0.20) { const f = t / 0.20; r = 10 + 10 * f; g = 20 + 40 * f; b = 80 + 80 * f; }
+                else if (t < 0.40) { const f = (t - 0.20) / 0.20; r = 20 + 40 * f; g = 60 + 80 * f; b = 160 - 100 * f; }
+                else if (t < 0.60) { const f = (t - 0.40) / 0.20; r = 60 + 60 * f; g = 140 + 20 * f; b = 60 - 20 * f; }
+                else if (t < 0.80) { const f = (t - 0.60) / 0.20; r = 120 + 100 * f; g = 160 - 60 * f; b = 40 - 20 * f; }
+                else { const f = (t - 0.80) / 0.20; r = 220 + 35 * f; g = 100 + 155 * f; b = 20 + 235 * f; }
+                d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255;
+            }
+            ctx.putImageData(id, 0, 0);
+            return new THREE.CanvasTexture(c);
+        }
+
+        // ════════════════════════════════════════
+        //  THREE.JS
+        // ════════════════════════════════════════
+
+        function initThree() {
+            const canvas = document.getElementById('three-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x07070e);
+            scene.fog = new THREE.FogExp2(0x07070e, 0.045);
+
+            camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.05, 500);
+            camera.position.set(0, 8, 11);
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+            renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.25;
+
+            orbitControls = new OrbitControls(camera, canvas);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.07;
+            orbitControls.minDistance = 1.5;
+            orbitControls.maxDistance = 50;
+            orbitControls.maxPolarAngle = Math.PI * 0.88;
+
+            // Lights
+            scene.add(new THREE.AmbientLight(0x334466, 1.0));
+
+            const sun = new THREE.DirectionalLight(0xfff0dd, 2.2);
+            sun.position.set(6, 14, 6);
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(2048, 2048);
+            sun.shadow.camera.left = sun.shadow.camera.bottom = -18;
+            sun.shadow.camera.right = sun.shadow.camera.top = 18;
+            sun.shadow.camera.far = 80;
+            scene.add(sun);
+
+            scene.add(Object.assign(new THREE.DirectionalLight(0x4488cc, 0.5), {
+                position: new THREE.Vector3(-6, 4, -6)
+            }));
+
+            // Stars
+            const starGeo = new THREE.BufferGeometry();
+            const sp = new Float32Array(3000);
+            for (let i = 0; i < 1000; i++) {
+                const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1), r = 90 + Math.random() * 40;
+                sp[i * 3] = r * Math.sin(ph) * Math.cos(th);
+                sp[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
+                sp[i * 3 + 2] = r * Math.cos(ph);
+            }
+            starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+            scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x9999cc, size: 0.18, transparent: true, opacity: 0.5 })));
+
+            window.addEventListener('resize', () => {
+                camera.aspect = innerWidth / innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(innerWidth, innerHeight);
+            });
+        }
+
+        function clearTerrain() {
+            if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh.material.dispose(); terrainMesh = null; }
+            if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); wireMesh = null; }
+        }
+
+        function buildTerrain() {
+            clearTerrain();
+            setProgress(15);
+
+            const segs = DETAIL_SEGS[detailIdx];
+            const geo = new THREE.PlaneGeometry(14, 14, segs, segs);
+            const pos = geo.attributes.position;
+            const uv = geo.attributes.uv;
+
+            setProgress(35);
+
+            for (let i = 0; i < pos.count; i++) {
+                const u = uv.getX(i);
+                const v = 1 - uv.getY(i);
+                let h = sampleH(currentHeightData, u, v);
+                if (invertH) h = 1 - h;
+                pos.setZ(i, (h - 0.5) * heightScale);
+            }
+            pos.needsUpdate = true;
+            geo.computeVertexNormals();
+
+            setProgress(65);
+
+            const mat = new THREE.MeshStandardMaterial({
+                map: origTexture,
+                roughness: 0.82,
+                metalness: 0.0,
+            });
+
+            terrainMesh = new THREE.Mesh(geo, mat);
+            terrainMesh.rotation.x = -Math.PI / 2;
+            terrainMesh.castShadow = true;
+            terrainMesh.receiveShadow = true;
+            scene.add(terrainMesh);
+
+            // Wireframe overlay
+            const wGeo = new THREE.WireframeGeometry(geo);
+            const wMat = new THREE.LineBasicMaterial({ color: 0x4444cc, transparent: true, opacity: 0.12 });
+            wireMesh = new THREE.LineSegments(wGeo, wMat);
+            wireMesh.rotation.x = -Math.PI / 2;
+            wireMesh.visible = showWire;
+            scene.add(wireMesh);
+
+            setProgress(90);
+            applyViewMode();
+            setProgress(100);
+        }
+
+        function updateDisplacement() {
+            if (!terrainMesh || !currentHeightData) return;
+            const pos = terrainMesh.geometry.attributes.position;
+            const uv = terrainMesh.geometry.attributes.uv;
+            for (let i = 0; i < pos.count; i++) {
+                let h = sampleH(currentHeightData, uv.getX(i), 1 - uv.getY(i));
+                if (invertH) h = 1 - h;
+                pos.setZ(i, (h - 0.5) * heightScale);
+            }
+            pos.needsUpdate = true;
+            terrainMesh.geometry.computeVertexNormals();
+            rebuildWire();
+        }
+
+        function rebuildWire() {
+            if (!wireMesh || !terrainMesh) return;
+            wireMesh.geometry.dispose();
+            wireMesh.geometry = new THREE.WireframeGeometry(terrainMesh.geometry);
+        }
+
+        function applyViewMode() {
+            if (!terrainMesh) return;
+            const mat = terrainMesh.material;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`[data-mode="${viewMode}"]`)?.classList.add('active');
+
+            switch (viewMode) {
+                case 'texture':
+                    mat.map = origTexture;
+                    mat.wireframe = false;
+                    mat.color.set(0xffffff);
+                    break;
+                case 'height':
+                    mat.map = heightTex;
+                    mat.wireframe = false;
+                    mat.color.set(0xffffff);
+                    break;
+                case 'normal':
+                    mat.map = null;
+                    mat.wireframe = false;
+                    mat.color.set(0xffffff);
+                    break;
+                case 'wire':
+                    mat.map = null;
+                    mat.wireframe = true;
+                    mat.color.set(0x6688ff);
+                    break;
+            }
+            mat.needsUpdate = true;
+        }
+
+        function startLoop() {
+            if (animId) cancelAnimationFrame(animId);
+            function loop() {
+                animId = requestAnimationFrame(loop);
+                orbitControls.autoRotate = autoRotate;
+                orbitControls.autoRotateSpeed = 0.6;
+                orbitControls.update();
+                renderer.render(scene, camera);
+            }
+            loop();
+        }
+
+        // ════════════════════════════════════════
+        //  UI
+        // ════════════════════════════════════════
+
+        function setProgress(p) { document.getElementById('progress-bar').style.width = p + '%'; }
+
+        function showLoading(msg = 'Generating 3D terrain…') {
+            const el = document.getElementById('loading-overlay');
+            document.getElementById('loading-label').textContent = msg;
+            el.style.display = 'flex';
+            setProgress(0);
+        }
+
+        function hideLoading() { setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 350); }
+
+        function processFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                showLoading('Processing image…');
+                document.getElementById('upload-screen').style.display = 'none';
+                document.getElementById('viewer-screen').style.display = 'block';
+                srcImage = img;
+
+                if (!renderer) { initThree(); startLoop(); }
+
+                setTimeout(() => {
+                    setProgress(5);
+                    document.getElementById('loading-label').textContent = 'Building height map…';
+
+                    currentHeightData = imgToGrayscale(img, smoothing);
+                    setProgress(12);
+
+                    origTexture = new THREE.Texture(img);
+                    origTexture.needsUpdate = true;
+                    heightTex = makeHeightColorTex(currentHeightData);
+
+                    document.getElementById('loading-label').textContent = 'Creating 3D mesh…';
+                    buildTerrain();
+
+                    camera.position.set(0, 8, 11);
+                    camera.lookAt(0, 0, 0);
+                    orbitControls.reset();
+                    hideLoading();
+                }, 40);
+            };
+            img.src = url;
+        }
+
+        // Drop zone
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); processFile(e.dataTransfer.files[0]); });
+
+        // Back
+        document.getElementById('back-btn').addEventListener('click', () => {
+            document.getElementById('upload-screen').style.display = 'flex';
+            document.getElementById('viewer-screen').style.display = 'none';
+            fileInput.value = '';
+        });
+
+        // Height scale
+        const slH = document.getElementById('slider-height'), valH = document.getElementById('val-height');
+        slH.addEventListener('input', () => {
+            heightScale = parseFloat(slH.value);
+            valH.textContent = heightScale.toFixed(1);
+            updateDisplacement();
+        });
+
+        // Smoothing
+        const slS = document.getElementById('slider-smooth'), valS = document.getElementById('val-smooth');
+        slS.addEventListener('input', () => {
+            smoothing = parseInt(slS.value);
+            valS.textContent = smoothing;
+            if (!srcImage) return;
+            showLoading('Re-smoothing…');
+            setTimeout(() => {
+                currentHeightData = imgToGrayscale(srcImage, smoothing);
+                heightTex = makeHeightColorTex(currentHeightData);
+                updateDisplacement();
+                if (viewMode === 'height') { terrainMesh.material.map = heightTex; terrainMesh.material.needsUpdate = true; }
+                hideLoading();
+            }, 30);
+        });
+
+        // Detail
+        const slD = document.getElementById('slider-detail'), valD = document.getElementById('val-detail');
+        slD.addEventListener('input', () => {
+            detailIdx = parseInt(slD.value);
+            valD.textContent = DETAIL_LABELS[detailIdx];
+            if (!srcImage) return;
+            showLoading('Rebuilding mesh…');
+            setTimeout(() => { buildTerrain(); hideLoading(); }, 30);
+        });
+
+        // View modes
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => { viewMode = btn.dataset.mode; applyViewMode(); });
+        });
+
+        // Toggles
+        document.getElementById('tog-rotate').addEventListener('change', e => autoRotate = e.target.checked);
+        document.getElementById('tog-invert').addEventListener('change', e => { invertH = e.target.checked; updateDisplacement(); });
+        document.getElementById('tog-wire').addEventListener('change', e => {
+            showWire = e.target.checked;
+            if (wireMesh) wireMesh.visible = showWire && viewMode !== 'wire';
+        });
+
+        // Reset camera
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            camera.position.set(0, 8, 11);
+            camera.lookAt(0, 0, 0);
+            orbitControls.reset();
+        });
+
+        // Screenshot
+        document.getElementById('btn-screenshot').addEventListener('click', () => {
+            renderer.render(scene, camera);
+            const a = document.createElement('a');
+            a.download = 'terrain-3d.png';
+            a.href = renderer.domElement.toDataURL('image/png');
+            a.click();
+        });
+    </script>
+</body>
+
+</html>

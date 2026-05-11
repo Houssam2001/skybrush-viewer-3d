@@ -31,6 +31,10 @@ const CustomEnvironmentUploader = () => {
   const camX = customEnvironment?.cameraPosition?.[0] ?? 0;
   const camY = customEnvironment?.cameraPosition?.[1] ?? 20;
   const camZ = customEnvironment?.cameraPosition?.[2] ?? 50;
+  
+  const rotX = customEnvironment?.rotation?.[0] ?? 0;
+  const rotY = customEnvironment?.rotation?.[1] ?? 0;
+  const rotZ = customEnvironment?.rotation?.[2] ?? 0;
 
   const useGoogleMaps = customEnvironment?.useGoogleMaps ?? false;
   const googleApiKey = customEnvironment?.googleApiKey ?? '';
@@ -61,6 +65,15 @@ const CustomEnvironmentUploader = () => {
       axis === 'z' ? value : camZ,
     ];
     dispatch(setCustomEnvironmentSettings({ cameraPosition: newCam }));
+  };
+
+  const updateRotation = (axis: 'x' | 'y' | 'z', value: number) => {
+    const newRot: [number, number, number] = [
+      axis === 'x' ? value : rotX,
+      axis === 'y' ? value : rotY,
+      axis === 'z' ? value : rotZ,
+    ];
+    dispatch(setCustomEnvironmentSettings({ rotation: newRot }));
   };
 
   return (
@@ -187,6 +200,15 @@ const CustomEnvironmentUploader = () => {
         <TextField label="X" type="number" value={posX} onChange={(e) => updatePosition('x', Number(e.target.value))} size="small" />
         <TextField label="Y" type="number" value={posY} onChange={(e) => updatePosition('y', Number(e.target.value))} size="small" />
         <TextField label="Z" type="number" value={posZ} onChange={(e) => updatePosition('z', Number(e.target.value))} size="small" />
+      </Box>
+
+      <Typography variant="body2" sx={{ fontWeight: 'bold' }} gutterBottom>
+        Environment Rotation
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+        <TextField label="X (Pitch)" type="number" value={rotX} onChange={(e) => updateRotation('x', Number(e.target.value))} size="small" />
+        <TextField label="Y (Yaw)" type="number" value={rotY} onChange={(e) => updateRotation('y', Number(e.target.value))} size="small" />
+        <TextField label="Z (Roll)" type="number" value={rotZ} onChange={(e) => updateRotation('z', Number(e.target.value))} size="small" />
       </Box>
 
       <Divider sx={{ my: 2 }} />

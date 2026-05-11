@@ -27,6 +27,7 @@ type SettingsSliceState = {
     showYaw: boolean;
     droneRadius?: number;
     droneModel?: DroneModelType;
+    customDroneModelUrl?: string;
     customEnvironment?: import('./types').CustomEnvironmentSettings;
   };
 };
@@ -76,6 +77,9 @@ const initialState: SettingsSliceState = {
     // Drone model to use in the 3D view
     droneModel: DEFAULT_DRONE_MODEL,
 
+    // Custom drone model URL
+    customDroneModelUrl: undefined,
+
     // Custom environment settings
     customEnvironment: {
       position: [0, 0, 0],
@@ -111,7 +115,7 @@ const { actions, reducer } = createSlice({
         const state_ = state as any;
 
         if (state_[category] !== undefined) {
-          state_[category] = { ...state_[category], ...updates };
+          Object.assign(state_[category], updates);
           
           // Automatically switch to custom scenery if Google Maps is enabled
           if (category === 'threeD' && updates.customEnvironment?.useGoogleMaps) {

@@ -134,11 +134,13 @@ export type DroneFlockProps = {
   showGlow: boolean;
   showLabels: boolean;
   showYaw: boolean;
+  customModelUrl: string;
   size: number;
 };
 
 type UAVEntityOptions = {
   droneModel: string;
+  customModelUrl?: string;
   label: string;
   labelColor: string;
   showGlow: boolean;
@@ -179,7 +181,7 @@ export type DroneFlockSystem = System & {
   _createPyroEffectEntity: () => Entity;
   _createTrajectoryPlayerForIndex: (index: number) => TrajectoryPlayer;
   _createYawIndicatorEntity: (showYaw: boolean) => Entity;
-  _entityFactories: Record<string, () => Entity> & {
+  _entityFactories: Record<string, (url?: string) => Entity> & {
     default: () => Entity;
   };
   _getElapsedSeconds: TimestampGetter;
@@ -244,6 +246,10 @@ AFrame.registerSystem('drone-flock', {
             obj: '#quadcopter',
           },
         }),
+      custom: (url?: string) =>
+        createEntity({
+          'gltf-model': url,
+        }),
     };
 
     this.rotateEntityLabelTowards = this.rotateEntityLabelTowards.bind(this);
@@ -253,6 +259,7 @@ AFrame.registerSystem('drone-flock', {
     this: DroneFlockSystem,
     {
       droneModel,
+      customModelUrl,
       label,
       labelColor,
       showGlow,
@@ -262,8 +269,10 @@ AFrame.registerSystem('drone-flock', {
   ) {
     const factory =
       this._entityFactories[droneModel] ?? this._entityFactories.default;
-    const droneEntity = factory();
-    droneEntity.setAttribute('material', createFlatShadedMaterialProps());
+    const droneEntity = factory(customModelUrl);
+    if (droneModel !== 'custom') {
+      droneEntity.setAttribute('material', createFlatShadedMaterialProps());
+    }
     droneEntity.setAttribute('shadow', 'cast: true; receive: true');
 
     droneEntity.append(this._createYawIndicatorEntity(showYaw));
@@ -534,6 +543,7 @@ AFrame.registerComponent('drone-flock', {
     showLabels: { default: false },
     showYaw: { default: false },
     size: { default: 0 },
+    customModelUrl: { default: '' },
   },
 
   init(this: DroneFlockComponent) {
@@ -684,11 +694,12 @@ AFrame.registerComponent('drone-flock', {
       showLabels,
       showYaw,
       size,
+      customModelUrl,
     } = this.data;
     let oldSize = oldData.size ?? 0;
     let forceDroneSizeUpdate = false;
 
-    if (oldDroneModel !== droneModel) {
+    if (oldDroneModel !== droneModel || (droneModel === 'custom' && oldData.customModelUrl !== customModelUrl)) {
       // Remove all existing entities as we need to re-create all of them
       // from scratch
       while (this._drones.length > 0) {
@@ -704,6 +715,7 @@ AFrame.registerComponent('drone-flock', {
       for (let i = oldSize; i < size; i++) {
         const entity = this.system!.createNewUAVEntity({
           droneModel,
+          customModelUrl,
           label: formatDroneIndex(i),
           labelColor,
           showGlow,

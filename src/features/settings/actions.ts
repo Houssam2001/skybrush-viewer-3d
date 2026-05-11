@@ -4,6 +4,8 @@ import type { AppThunk } from '~/store';
 import type { SceneryType } from '~/views/player/Scenery';
 
 import { updateAppSettings } from './slice';
+
+export { updateAppSettings };
 import type { DroneModelType } from './types';
 
 export const setDroneRadius = (droneRadius: number) =>
@@ -11,6 +13,9 @@ export const setDroneRadius = (droneRadius: number) =>
 
 export const setDroneModel = (droneModel: DroneModelType) =>
   updateAppSettings('threeD', { droneModel });
+
+export const setCustomDroneModelUrl = (customDroneModelUrl: string | undefined) =>
+  updateAppSettings('threeD', { customDroneModelUrl });
 
 export const setLanguage = (language: string) =>
   updateAppSettings('general', { language });

@@ -1,7 +1,7 @@
-export type DroneModelType = 'sphere' | 'quad' | 'flapper';
+export type DroneModelType = 'sphere' | 'quad' | 'flapper' | 'custom';
 
 export function isValidDroneModelType(value: string): value is DroneModelType {
-  return value === 'sphere' || value === 'quad' || value === 'flapper';
+  return value === 'sphere' || value === 'quad' || value === 'flapper' || value === 'custom';
 }
 
 export type CustomEnvironmentSettings = {
